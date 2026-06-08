@@ -531,9 +531,12 @@ def run_simulation():
 
     model = DamagePlasticityModel3D(params)
 
-    n_steps = 50; eps_max = 0.02
+    n_steps = 50; eps_max = -0.02  # 压缩加载 (κ 在此路径下激活)
     eps_vals = np.linspace(0.0, eps_max, n_steps)
-    print(f"\nLoading: uniaxial tension eps11 0->{eps_max}, {n_steps} steps")
+    print(f"\nLoading: uniaxial COMPRESSION eps11 0->{eps_max}, {n_steps} steps")
+    print(f"  (Compression chosen because: l,m,n<0 => psi3>0 under compression,")
+    print(f"   so Y_kappa = psi3 > 0 -> kappa activates)")
+    print(f"  (Under tension, psi3<0 -> Y_kappa=max(0,psi3)=0 -> kappa stays zero)")
 
     N = n_steps + 1
     hist = {
@@ -642,7 +645,7 @@ Algorithm statistics:
     elif max_res < 1e-8:
         print("   >>> Near machine precision")
     elif max_res < 1e-2:
-        print(f"   >>> EXCELLENT — residual = {max_res:.1e} ({max_res/hist['sigma_11'][-1]*100:.3f}% of max stress)")
+        print(f"   >>> EXCELLENT — residual = {max_res:.1e} ({max_res/abs(hist['sigma_11'][-1])*100:.3f}% of final |sigma|)")
         print(f"   (Remaining error from backward-Euler O(dt^2) integration, not algorithmic inconsistency)")
     elif max_res < 1e-1:
         print("   --- Acceptable ---")
@@ -662,13 +665,13 @@ Algorithm statistics:
 4. Key events:""")
 
     if yield_step is not None:
-        print(f"   First yield:      step {yield_step+1}, eps={hist['eps_11'][yield_step+1]:.5f}")
+        print(f"   First yield:      step {yield_step+1}, eps={hist['eps_11'][yield_step+1]:.5f}, sig={hist['sigma_11'][yield_step+1]:.1f} MPa")
     if D_onset is not None:
-        print(f"   D damage onset:   step {D_onset+1}, D1={hist['D1'][D_onset+1]:.4f}")
+        print(f"   D damage onset:   step {D_onset+1}, eps={hist['eps_11'][D_onset+1]:.5f}, D1={hist['D1'][D_onset+1]:.6f}")
     if kap_onset is not None:
-        print(f"   kappa onset:      step {kap_onset+1}, kappa={hist['kappa'][kap_onset+1]:.4f}")
+        print(f"   kappa onset:      step {kap_onset+1}, eps={hist['eps_11'][kap_onset+1]:.5f}, kappa={hist['kappa'][kap_onset+1]:.6f}")
     else:
-        print("   kappa NOT activated (Murnaghan l,m,n < 0 -> psi3 < 0)")
+        print("   kappa NOT activated (check loading path and Murnaghan sign)")
 
     print(f"\n   Final: sig11={hist['sigma_11'][-1]:.1f} MPa, "
           f"D=[{hist['D1'][-1]:.4f},{hist['D2'][-1]:.4f},{hist['D3'][-1]:.4f}], "
@@ -687,7 +690,7 @@ Algorithm statistics:
     ax = axes[0, 0]
     ax.plot(eps, sig, 'b-', lw=2)
     ax.set_xlabel(r'总应变 $\varepsilon_{11}$'); ax.set_ylabel(r'$\sigma_{11}$ [MPa]')
-    ax.set_title(r'轴向应力-应变 $\sigma_{11}\!-\!\varepsilon_{11}$')
+    ax.set_title(r'单轴压缩应力-应变 $\sigma_{11}\!-\!\varepsilon_{11}$')
     if yield_step is not None:
         ax.plot(eps[yield_step+1], sig[yield_step+1], 'ro', ms=10, label='屈服点')
     if D_onset is not None:
@@ -751,7 +754,7 @@ Algorithm statistics:
   KEY RESULTS (corrected Clausius-Duhem sign):
     Total dissipation    = {total_diss:.4f}  (>0, 2nd Law satisfied)
     Negative D steps     = {diss_warnings}/50  (ZERO — all non-negative!)
-    Energy residual max  = {max_res:.2e}  ({max_res/hist['sigma_11'][-1]*100:.3f}% of max stress)
+    Energy residual max  = {max_res:.2e}  ({max_res/abs(hist['sigma_11'][-1])*100:.3f}% of final |sigma|)
     Δψ residual source   = backward-Euler O(dt^2) integration error,
                            NOT algorithmic inconsistency
 
